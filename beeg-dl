@@ -5,12 +5,14 @@ import re, urllib2, pickle, sys
 import argparse
 import os
 from download import Download
+import pycurl
 
 
 pageurl_regex = re.compile('http://beeg.com\/\d+')
 mp4url_regex = re.compile('http://.+\.mp4')
 datafile = 'ret.pk'
 ret = []
+rate_limit= 40*1024
 
 def extract():
 
@@ -31,23 +33,31 @@ def extract():
     
     pickle.dump(set(vidzurls), open(datafile,'w'))
 
+def curl_progress(total, existing, upload_t, upload_d):
+    try:
+        frac = float(existing)/float(total)
+    except:
+        frac = 0
+        print "Downloaded %d/%d (%0.2f%%)" % (existing, total, frac)
+
+
 def download():
     vidzurls = pickle.load(open(datafile))
     for vidzurl in vidzurls:
-#        dl = Download(vidzurl, '.')
-#        dl.start()
-#    return
-
-        print("download "+ vidzurl)
         filename = os.path.basename(vidzurl)
-        req = urllib2.urlopen(vidzurl)
-        CHUNK = 16 * 1024
-        with open(filename, 'wb') as fp:
-          while True:
-              chunk = req.read(CHUNK)
-              if not chunk: break
-              fp.write(chunk)
-              print "*"
+        c = pycurl.Curl()
+        c.setopt(c.URL, vidzurl)
+        c.setopt(c.MAX_RECV_SPEED_LARGE, rate_limit)
+        if os.path.exists(filename):
+            file_id = open(filename, "ab")
+            c.setopt(c.RESUME_FROM, os.path.getsize(filename))
+        else:
+            file_id = open(filename, "wb")
+
+        c.setopt(c.WRITEDATA, file_id)
+        c.setopt(c.NOPROGRESS, 0)
+        c.setopt(c.PROGRESSFUNCTION, curl_progress)
+        c.perform()
 
 
 if __name__ == "__main__":
