@@ -1,0 +1,72 @@
+#!/usr/bin/env python
+
+
+import re, urllib2, pickle, sys
+import argparse
+import os
+
+
+pageurl_regex = re.compile('http://beeg.com\/\d+')
+mp4url_regex = re.compile('http://.+\.mp4')
+datafile = 'ret.pk'
+ret = []
+
+def extract():
+
+    pageurls = []
+    vidzurls = []
+
+    for i in range(2):
+        html_src = urllib2.urlopen('http://beeg.com/section/home/'+str(i)+'/').read() 
+        matches = pageurl_regex.findall(html_src) 
+        pageurls.extend(set(matches))
+
+    for pageurl in pageurls:
+        print('looking into '+ pageurl+ '...')
+        html_src = urllib2.urlopen(pageurl).read()
+        matches = mp4url_regex.findall(html_src)
+        vidzurls.extend(set(matches))
+        print("\t\tfound "+ str(len(matches)))
+    
+    pickle.dump(set(vidzurls), open(datafile,'w'))
+
+def download():
+    vidzurls = pickle.load(open(datafile))
+    for vidzurl in vidzurls:
+        print("download "+ vidzurl)
+        filename = os.path.basename(vidzurl)
+        req = urllib2.urlopen(vidzurl)
+        CHUNK = 16 * 1024
+        with open(filename, 'wb') as fp:
+          while True:
+              chunk = req.read(CHUNK)
+              if not chunk: break
+              fp.write(chunk)
+              print "*"
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='download vidz from beeg.com')
+    parser.add_argument('-u',  action='store_true',
+                      help='get vidz urls, and save them to a data file.')
+
+    parser.add_argument('-d', action='store_true',
+                      help='download vidz according to data file.')
+
+    parser.add_argument('-a', action='store_false',
+                      help='get urls and download them.(default)')
+
+    args = vars(parser.parse_args())
+
+    if args['u']:
+        extract()
+        sys.exit()
+
+    elif args['d']:
+        download()
+        sys.exit()
+
+    else:
+        extract()
+        download()
+        sys.exit()
