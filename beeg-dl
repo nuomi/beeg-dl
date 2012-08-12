@@ -4,6 +4,7 @@
 import re, urllib2, pickle, sys
 import argparse
 import os
+from download import Download
 
 
 pageurl_regex = re.compile('http://beeg.com\/\d+')
@@ -33,6 +34,10 @@ def extract():
 def download():
     vidzurls = pickle.load(open(datafile))
     for vidzurl in vidzurls:
+#        dl = Download(vidzurl, '.')
+#        dl.start()
+#    return
+
         print("download "+ vidzurl)
         filename = os.path.basename(vidzurl)
         req = urllib2.urlopen(vidzurl)
