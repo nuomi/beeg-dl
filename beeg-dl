@@ -3,7 +3,7 @@
 
 import re, urllib2, pickle, sys
 import argparse
-import os
+import os, time
 
 
 pageurl_regex = re.compile('http://beeg.com\/\d+')
@@ -30,19 +30,65 @@ def extract():
     
     pickle.dump(set(vidzurls), open(datafile,'w'))
 
-def download():
+def downloadOne(opener, url, filename):
+    count = 0
+    step  = 16*1024
+    downloading = True
+    success = False
+    while (not(success)) and downloading:
+        try:
+            Err = ""
+            netfile = opener.open(url)
+            filesize = float(netfile.info()['Content-Length'])
+            
+            if os.path.exists(filename) and os.path.isfile(filename):
+                count = os.path.getsize(filename)
+
+            print count,"of",filesize , "downloaded."
+
+            if count >= filesize:
+                downloading = False
+                success = True
+                netfile.close()
+                return
+
+            if os.path.exists(filename) and os.path.isfile(filename):
+                netfile.close()
+                req = urllib2.Request(url)
+                print "file downloading at byte: ", count
+                req.add_header("Range","bytes=%s-" % (count))
+                netfile = opener.open(req)
+
+            if (downloading):
+                nextbyte = netfile.read(step)
+                outfile = open(filename, "ab")
+                outfile.write(nextbyte)
+                count += step
+                while (len(nextbyte)>0) and downloading:
+                    nextbyte = netfile.read(step)
+                    outfile.write(nextbyte)
+                    count += len(nextbyte)
+                success = True
+        except IOError, e:
+            print e
+            Err=("Download error, retrying in a few seconds: "+str(e))
+            try:
+                netfile.close()
+            except Exception:
+                pass
+            time.sleep(8)
+
+
+
+
+def downloadAll():
     vidzurls = pickle.load(open(datafile))
+    opener = urllib2.build_opener();
+
     for vidzurl in vidzurls:
         print("download "+ vidzurl)
         filename = os.path.basename(vidzurl)
-        req = urllib2.urlopen(vidzurl)
-        CHUNK = 16 * 1024
-        with open(filename, 'wb') as fp:
-          while True:
-              chunk = req.read(CHUNK)
-              if not chunk: break
-              fp.write(chunk)
-              print "*"
+        downloadOne(opener, vidzurl, filename)
 
 
 if __name__ == "__main__":
@@ -63,10 +109,10 @@ if __name__ == "__main__":
         sys.exit()
 
     elif args['d']:
-        download()
+        downloadAll()
         sys.exit()
 
     else:
         extract()
-        download()
+        downloadAll()
         sys.exit()
