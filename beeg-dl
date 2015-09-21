@@ -4,13 +4,10 @@
 import re, urllib2, pickle, sys
 import argparse
 import os
-from download import Download
 import pycurl
 
 pageurl_regex = re.compile('http://beeg.com\/\d+')
-#pageurl_regex = re.compile('tag[a-zA-Z]+')
-mp4url_regex = re.compile('http://.+480p.+\.mp4')
-#mp4url_regex = re.compile('http://.+\.mp4')
+mp4url_regex = re.compile('http://.+speed.+480p.+\.mp4')
 tumb_id_regex = re.compile('tumb_id.+[0-9+,+\[+\]+];')
 tumb_id_i_single_regex = re.compile('[0-9]+')
 datafile = 'ret.pk'
@@ -19,6 +16,7 @@ rate_limit= 40*1024
 
 def extract():
     print ("Extracting...")
+    f = open(datafile, 'w')
     pageurls = []
     vidzurls = []
 
@@ -31,21 +29,19 @@ def extract():
 
     k=0
     for pageurl in pageurls:
-	if k > 3:
+	if k > 13:
 		break
 	pageurl = 'http://beeg.com/'+pageurl
-        print('looking into '+ pageurl+ '...')
+        print('['+str(k)+']looking into '+ pageurl+ '...')
         html_src = urllib2.urlopen(pageurl).read()
         matches = mp4url_regex.findall(html_src)
         vidzurls.extend(set(matches))
         print("\t\tfound "+ str(len(matches)))
-        k=k+1
+	if len(matches)>0:
+		videourl=matches[0]
+		f.write(videourl+"\n")
+        	k=k+1
 
-    print vidzurls   
-    #print "---"
-    #print set(vidzurls)   
- 
-    pickle.dump(set(vidzurls), open(datafile,'w'))
 
 def curl_progress(total, existing, upload_t, upload_d):
     try:
@@ -55,16 +51,21 @@ def curl_progress(total, existing, upload_t, upload_d):
         print "Downloaded %d/%d (%0.2f%%)" % (existing, total, frac)
 
 def download():
-    print ("Downloading...")
-    vidzurls = pickle.load(open(datafile))
-    for vidzurl in vidzurls:
+    if args['dd']:
+    	dest_dir = args['dd']
+    else:
+	dest_dir = "./"
+
+    print ("Downloading... in "+dest_dir)
+    f = open(datafile, 'r')
+    for vidzurl in f:
 	print "D: "+vidzurl
         filename = os.path.basename(vidzurl)
         if os.path.exists(filename):
 		pass #TODO
 	else:
 		u = urllib2.urlopen(vidzurl)
-		f = open(filename, 'wb')
+		f = open(dest_dir+filename, 'wb')
 		meta = u.info()
 		file_size = int(meta.getheaders("Content-Length")[0])
 		print "Downloading: %s Bytes: %s" % (filename, file_size)
@@ -95,8 +96,12 @@ if __name__ == "__main__":
 
     parser.add_argument('-a', action='store_false',
                       help='get urls and download them.(default)')
+    
+    parser.add_argument('-dd', help='destination dir', type=str)
 
     args = vars(parser.parse_args())
+
+    print args['dd']
 
     if args['u']:
         extract()
